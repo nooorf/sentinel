@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sentinel · Fraud operations</title>
+<meta name="description" content="Real-time card fraud scoring with drift monitoring and gated retraining.">
+<link rel="preload" href="/static/fonts/source-serif-4-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/static/fonts/libre-franklin-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/static/app.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23990F3D'/%3E%3Cpath d='M4 11.5l4-7 4 7' stroke='%23FFF1E5' stroke-width='1.8' fill='none'/%3E%3C/svg%3E">
+</head>
+<body>
+<header class="masthead">
+  <div class="masthead__inner">
+    <a class="wordmark" href="#overview" aria-label="Sentinel home">
+      <svg class="wordmark__mark" viewBox="0 0 16 16" aria-hidden="true"><rect width="16" height="16"/><path d="M4 11.5l4-7 4 7"/></svg>
+      <span>Sentinel</span>
+    </a>
+    <nav class="tabs" aria-label="Sections">
+      <a href="#overview" data-view="overview">Overview</a>
+      <a href="#score" data-view="score">Score</a>
+      <a href="#monitoring" data-view="monitoring">Monitoring</a>
+      <a href="#models" data-view="models">Models</a>
+    </nav>
+    <div class="status" id="status" role="status" aria-live="polite"><span class="status__dot"></span><span class="status__text">Connecting…</span></div>
+  </div>
+</header>
+
+<div class="banner" id="banner" hidden></div>
+
+<main id="main">
+  <!-- Overview -->
+  <section class="view" id="view-overview" aria-labelledby="ov-title">
+    <div class="split">
+      <div class="split__main">
+        <h1 id="ov-title" class="headline">Loading results…</h1>
+        <p class="standfirst" id="ov-standfirst"></p>
+        <figure class="chart" aria-labelledby="ov-chart-title">
+          <figcaption>
+            <h2 id="ov-chart-title" class="chart__title">Sentinel vs. the baseline model, held-out test window</h2>
+            <ul class="legend"><li><i class="sw sw--base"></i>Baseline (logistic regression)</li><li><i class="sw sw--sentinel"></i>Sentinel (XGBoost)</li></ul>
+          </figcaption>
+          <div class="pairs" id="ov-pairs"></div>
+          <p class="source" id="ov-source"></p>
+        </figure>
+      </div>
+      <aside class="split__side">
+        <h2 class="label">Key figures</h2>
+        <dl class="figures" id="ov-figures"></dl>
+        <div class="desk" id="ov-desk">
+          <h2 class="desk__title">Score a transaction</h2>
+          <p class="desk__note">A real transaction from the held-out test set, scored live by the API.</p>
+          <label class="field"><span>Transaction</span><select id="ov-example"></select></label>
+          <button class="btn btn--primary" id="ov-score" type="button">Score transaction</button>
+          <div class="desk__result" id="ov-result" aria-live="polite"></div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="split split--even">
+      <figure class="chart" aria-labelledby="ov-pr-title">
+        <figcaption>
+          <h2 id="ov-pr-title" class="chart__title">Precision and recall on unseen transactions</h2>
+          <p class="chart__sub" id="ov-pr-sub"></p>
+        </figcaption>
+        <div class="pr" id="ov-pr"></div>
+        <p class="source">Source: Sentinel evaluation, held-out test split. Each model at its own validation-tuned threshold.</p>
+      </figure>
+      <figure class="chart" aria-labelledby="ov-out-title">
+        <figcaption>
+          <h2 id="ov-out-title" class="chart__title">The analysts' review queue</h2>
+          <p class="chart__sub">Every transaction sent to manual review in the test window, by actual outcome.</p>
+          <ul class="legend"><li><i class="sw sw--fraud"></i>Fraud</li><li><i class="sw sw--legit"></i>Legitimate</li></ul>
+        </figcaption>
+        <div class="queue" id="ov-queue"></div>
+        <p class="source">Source: Sentinel evaluation, held-out test split.</p>
+      </figure>
+    </div>
+  </section>
+
+  <!-- Score -->
+  <section class="view" id="view-score" aria-labelledby="sc-title" hidden>
+    <h1 id="sc-title" class="headline headline--page">Score a transaction</h1>
+    <p class="standfirst">Choose a real card transaction from the held-out test set. Sentinel scores it through <code>POST /predict</code> and decides whether it goes to manual review.</p>
+    <div class="split">
+      <div class="split__main">
+        <h2 class="label">Held-out transactions</h2>
+        <table class="table table--pick" id="sc-table">
+          <thead><tr><th scope="col"><span class="sr-only">Select</span></th><th scope="col">Transaction</th><th scope="col" class="num">Amount</th><th scope="col">Actual outcome</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="actions"><button class="btn btn--primary" id="sc-score" type="button">Score selected transaction</button></div>
+        <details class="features" id="sc-features"><summary>Show the 29 model inputs</summary><div class="features__grid"></div></details>
+      </div>
+      <aside class="split__side">
+        <h2 class="label">Decision</h2>
+        <div class="verdict" id="sc-verdict" aria-live="polite"><p class="empty">Select a transaction and score it to see Sentinel's decision.</p></div>
+      </aside>
+    </div>
+    <h2 class="label label--section">Scored this session</h2>
+    <table class="table" id="sc-session">
+      <thead><tr><th scope="col">Time</th><th scope="col">Transaction</th><th scope="col" class="num">Amount</th><th scope="col">Actual</th><th scope="col" class="num">Fraud probability</th><th scope="col">Decision</th><th scope="col" class="num">Round trip</th></tr></thead>
+      <tbody><tr class="table__empty"><td colspan="7">Nothing scored yet.</td></tr></tbody>
+    </table>
+  </section>
+
+  <!-- Monitoring -->
+  <section class="view" id="view-monitoring" aria-labelledby="mo-title" hidden>
+    <h1 id="mo-title" class="headline headline--page">Drift monitoring</h1>
+    <p class="standfirst" id="mo-standfirst">Sentinel compares incoming traffic with the data its model was validated on, feature by feature, using Evidently. A shift in the inputs raises an alert and can trigger retraining.</p>
+    <form class="controls" id="mo-form">
+      <label class="field"><span>Shift size</span>
+        <select name="magnitude"><option value="1">1 standard deviation</option><option value="2" selected>2 standard deviations</option><option value="3">3 standard deviations</option></select></label>
+      <label class="field"><span>Transactions per batch</span>
+        <select name="n"><option>300</option><option selected>500</option><option>1000</option></select></label>
+      <label class="check"><input type="checkbox" name="auto"> Retrain automatically if drift is detected</label>
+      <button class="btn btn--primary" type="submit" id="mo-run">Simulate a traffic shift</button>
+    </form>
+    <figure class="chart" aria-labelledby="mo-chart-title">
+      <figcaption>
+        <h2 id="mo-chart-title" class="chart__title">Feature drift by batch</h2>
+        <ul class="legend"><li><i class="sw sw--steady"></i>Stable</li><li><i class="sw sw--drift"></i>Drift detected</li></ul>
+      </figcaption>
+      <div class="drift" id="mo-drift"><p class="empty">Run a simulated shift to compare an unchanged batch of held-out traffic with a shifted one.</p></div>
+      <p class="source" id="mo-source"></p>
+    </figure>
+  </section>
+
+  <!-- Models -->
+  <section class="view" id="view-models" aria-labelledby="md-title" hidden>
+    <h1 id="md-title" class="headline headline--page">Model registry</h1>
+    <p class="standfirst">Every model version, how it got there, and which one is serving. New models are promoted only if they pass the validation gate.</p>
+    <div class="split">
+      <div class="split__main">
+        <h2 class="label">Versions</h2>
+        <table class="table" id="md-versions">
+          <thead><tr><th scope="col">Version</th><th scope="col">Status</th><th scope="col">Registered</th><th scope="col">Note</th></tr></thead><tbody></tbody>
+        </table>
+        <h2 class="label label--section">Retraining runs</h2>
+        <table class="table" id="md-runs">
+          <thead><tr><th scope="col">Requested</th><th scope="col">Trigger</th><th scope="col">Status</th><th scope="col">Outcome</th></tr></thead><tbody></tbody>
+        </table>
+      </div>
+      <aside class="split__side">
+        <h2 class="label">Serving now</h2>
+        <dl class="figures" id="md-active"></dl>
+        <div class="desk">
+          <h2 class="desk__title">Retrain</h2>
+          <p class="desk__note">Trains a candidate on the labelled history and promotes it only if it matches or beats the serving model on validation.</p>
+          <button class="btn btn--primary" id="md-retrain" type="button">Retrain now</button>
+          <p class="desk__msg" id="md-retrain-msg" aria-live="polite"></p>
+        </div>
+        <div class="danger" id="md-rollback">
+          <h2 class="desk__title">Roll back</h2>
+          <p class="desk__note" id="md-rollback-note"></p>
+          <button class="btn btn--outline" id="md-rollback-btn" type="button">Roll back…</button>
+          <div class="confirm" id="md-rollback-confirm" hidden>
+            <p>Switch serving to <b id="md-rollback-target"></b>?</p>
+            <button class="btn btn--outline" id="md-rollback-yes" type="button">Yes, roll back</button>
+            <button class="btn btn--quiet" id="md-rollback-no" type="button">Cancel</button>
+          </div>
+          <p class="desk__msg" id="md-rollback-msg" aria-live="polite"></p>
+        </div>
+      </aside>
+    </div>
+  </section>
+</main>
+
+<footer class="colophon">
+  <p>Sentinel · XGBoost and Isolation Forest fraud scoring · Evidently drift monitoring · data: ULB credit card fraud dataset (Kaggle) · <a href="/docs">API reference</a></p>
+</footer>
+<script src="/static/app.js" defer></script>
+</body>
+</html>

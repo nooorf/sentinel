@@ -1,0 +1,9 @@
+.git
+var
+data/raw/*
+**/__pycache__
+.pytest_cache
+.ruff_cache
+mlruns
+tests
+docs

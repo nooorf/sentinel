@@ -1,0 +1,30 @@
+# Single API process: serves the API, the dashboard at / and the background retraining worker thread.
+# Run ONE uvicorn worker: model state and the retraining lock live in-process (see docs/engineering_decisions.md).
+services:
+  api:
+    build: .
+    image: sentinel:local
+    ports: ["8000:8000"]
+    environment: &env
+      SENTINEL_DATA_PATH: /app/data/raw/creditcard.csv
+      SENTINEL_DATA_DIR: /app/var
+      SENTINEL_SAMPLE_FRAC: ${SENTINEL_SAMPLE_FRAC:-}
+      SENTINEL_TARGET_RECALL: ${SENTINEL_TARGET_RECALL:-0.80}
+      SENTINEL_MONITOR_MIN_SAMPLES: ${SENTINEL_MONITOR_MIN_SAMPLES:-200}
+      SENTINEL_DRIFT_SHARE_THRESHOLD: ${SENTINEL_DRIFT_SHARE_THRESHOLD:-0.30}
+      SENTINEL_AUTO_RETRAIN_ON_DRIFT: ${SENTINEL_AUTO_RETRAIN_ON_DRIFT:-false}
+      SENTINEL_RETRAIN_MIN_FRAUD: ${SENTINEL_RETRAIN_MIN_FRAUD:-20}
+      SENTINEL_GATE_MIN_RECALL: ${SENTINEL_GATE_MIN_RECALL:-0.70}
+      SENTINEL_GATE_MIN_PRECISION: ${SENTINEL_GATE_MIN_PRECISION:-0.30}
+      SENTINEL_GATE_MIN_PR_AUC_DELTA: ${SENTINEL_GATE_MIN_PR_AUC_DELTA:-0.0}
+      SENTINEL_GATE_MIN_VAL_FRAUDS: ${SENTINEL_GATE_MIN_VAL_FRAUDS:-30}
+      SENTINEL_RETRAIN_MIN_NEW_FRAUD_LABELS: ${SENTINEL_RETRAIN_MIN_NEW_FRAUD_LABELS:-0}
+    volumes:
+      - ./var:/app/var          # models, registry, SQLite db, drift reports, MLflow db (persistent)
+      - ./data:/app/data:ro     # dataset (not baked into the image)
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8000/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s

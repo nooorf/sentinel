@@ -1,0 +1,11 @@
+# Copy to azure_config.yaml (git-ignored) and edit. No secrets here: authentication uses `az login`.
+subscription_id: "00000000-0000-0000-0000-000000000000"
+resource_group: "rg-sentinel"
+workspace: "mlw-sentinel"
+location: "westeurope"
+endpoint_name: "sentinel-fraud-ep"   # must be unique within the Azure region
+instance_type: "Standard_DS3_v2"     # CPU SKU; check quota for your subscription/region
+instance_count: 1
+model_name: "sentinel-fraud"
+# Base image and conda spec are UNVERIFIED defaults - confirm the image exists/is supported before deploying.
+base_image: "mcr.microsoft.com/azureml/openmpi4.1.2-ubuntu20.04:latest"

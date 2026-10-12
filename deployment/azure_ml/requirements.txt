@@ -1,0 +1,5 @@
+# Deployment-time client libraries. Versions are the ranges available at authoring time (azure-ai-ml latest seen: 1.35.1);
+# pin exact versions after your first successful deployment.
+azure-ai-ml>=1.20,<2
+azure-identity>=1.19
+pyyaml>=6

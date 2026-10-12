@@ -1,0 +1,36 @@
+# data & artifacts
+data/raw/*
+!data/raw/.gitkeep
+var/
+mlruns/
+mlflow.db
+*.joblib
+*.pkl
+*.csv.gz
+reports/drift/
+# secrets / env
+.env
+*.pem
+azure_config.yaml
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+deployment/azure_ml/build/
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+# local design tooling (impeccable skill, Copilot agents/hooks) and its working files
+.impeccable/
+.github/skills/
+.github/agents/
+.github/hooks/
+# local working notes and design briefs
+PROGRESS.md
+PRODUCT.md
+DESIGN.md

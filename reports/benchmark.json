@@ -1,0 +1,57 @@
+{
+ "model_version": "v20261012074136-adf95d2a",
+ "decision_model": "xgboost",
+ "model_only": {
+  "single": {
+   "p50": 1.8991255001310492,
+   "p95": 2.0425124993835198,
+   "p99": 2.132174819644206,
+   "mean": 1.914138860007976,
+   "n": 300
+  },
+  "batch_100": {
+   "p50": 2.677333499832457,
+   "p95": 2.787248250524499,
+   "p99": 2.847980040060065,
+   "mean": 2.6921987667265057,
+   "n": 30
+  }
+ },
+ "http_single_sequential": {
+  "p50": 3.8080624995018297,
+  "p95": 4.233013150769693,
+  "p99": 9.749486430455358,
+  "mean": 4.0585516733578215,
+  "n": 300
+ },
+ "http_batch_100": {
+  "p50": 10.866458500004228,
+  "p95": 11.02603735048433,
+  "p99": 11.075678390006942,
+  "mean": 10.862363899983999,
+  "n": 30
+ },
+ "http_concurrent": {
+  "p50": 29.7323330000836,
+  "p95": 40.41974854972067,
+  "p99": 60.748703239623865,
+  "mean": 30.684421711672865,
+  "n": 600,
+  "concurrency": 8,
+  "requests": 600,
+  "throughput_rps": 260.2385761696231
+ },
+ "environment": {
+  "platform": "macOS-14.4.1-arm64-arm-64bit",
+  "python": "3.11.16",
+  "cpu_count": 8,
+  "machine": "arm64",
+  "single_request_rows": 1,
+  "batch_rows": 100,
+  "iterations": 300,
+  "warmup": 50,
+  "seed": 0,
+  "uvicorn_workers": 1,
+  "note": "client and server share this machine; the HTTP client is a Python thread pool"
+ }
+}

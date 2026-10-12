@@ -1,0 +1,18 @@
+[project]
+name = "sentinel"
+version = "0.1.0"
+description = "Sentinel - Real-Time Fraud Detection & Adaptive Model Monitoring (portfolio project)"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["UP038", "B008", "E501", "E702", "E731", "E402"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q -p no:cacheprovider"
+filterwarnings = ["ignore::DeprecationWarning", "ignore::FutureWarning", "ignore::UserWarning"]
