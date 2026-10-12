@@ -1,87 +1,107 @@
 <div align="center">
 
-# Sentinel
+<img src="docs/assets/hero.svg" alt="Sentinel: real-time fraud detection that watches itself. Transactions are scored live against a review threshold and fraud is sent to review." width="100%">
 
-**Real-time card fraud detection with drift monitoring and gated, automated retraining.**
+<br>
 
-An end-to-end ML system: an XGBoost and Isolation Forest scoring API, Evidently drift monitoring, a model registry with a promotion gate and rollback, and a fraud-operations console, shipped as one Docker container.
+[![CI](https://img.shields.io/github/actions/workflow/status/nooorf/sentinel/ci.yml?branch=main&style=for-the-badge&label=CI&labelColor=33302E&logo=githubactions&logoColor=white)](https://github.com/nooorf/sentinel/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/Python-3.11-0F5499?style=for-the-badge&labelColor=33302E&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115-0D7680?style=for-the-badge&labelColor=33302E&logo=fastapi&logoColor=white)
+![XGBoost](https://img.shields.io/badge/XGBoost-2.1-990F3D?style=for-the-badge&labelColor=33302E)<br>
+![Evidently](https://img.shields.io/badge/Evidently-drift-E8812A?style=for-the-badge&labelColor=33302E)
+![MLflow](https://img.shields.io/badge/MLflow-tracking-0B4580?style=for-the-badge&labelColor=33302E&logo=mlflow&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-one%20container-0F5499?style=for-the-badge&labelColor=33302E&logo=docker&logoColor=white)
 
-![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
-![XGBoost](https://img.shields.io/badge/XGBoost-2.1-EB5B25)
-![scikit--learn](https://img.shields.io/badge/scikit--learn-1.5-F7931E?logo=scikitlearn&logoColor=white)
-![Evidently](https://img.shields.io/badge/Evidently-drift%20monitoring-4B32C3)
-![MLflow](https://img.shields.io/badge/MLflow-tracking-0194E2?logo=mlflow&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-42%20passing-2E7D32)
+**[Demo](#demo) · [Results](#results) · [Architecture](#architecture) · [Quick start](#quick-start) · [API](#api)**
 
-![Sentinel operations console](docs/screenshots/overview.png)
+</div>
 
+An end-to-end ML system for card fraud: an XGBoost and Isolation Forest scoring API, Evidently drift monitoring, a model registry with a promotion gate and rollback, and a fraud-operations console, all shipped as one Docker container.
+
+## Demo
+
+<div align="center">
+<img src="docs/assets/demo.gif" alt="Sentinel console: scoring a fraudulent and a legitimate held-out transaction, simulating a traffic shift that raises a drift alert, and the model registry" width="100%">
+<br>
+<sub>Scoring real held-out transactions, raising a drift alert on a simulated traffic shift, and the model registry. Everything is served live by the API.</sub>
 </div>
 
 ## Results
 
-Evaluated on a **held-out, time-ordered test window of 56,746 real card transactions** that the model never saw during training or tuning. Sentinel is compared with a logistic-regression baseline, with both models' thresholds tuned on validation data to an 80% recall target.
+<img src="docs/assets/results.svg" alt="On 56,746 held-out transactions Sentinel cuts false alarms from 91 to 49 (−46%), manual reviews from 153 to 106 (−31%) and legitimate spend held from €66,282 to €35,420 (−47%). Precision 0.538 vs 0.405, PR-AUC 0.776 vs 0.744, fraud cost −62% vs no screening, p99 latency 9.7 ms, 260 requests/s." width="100%">
 
-| | Baseline | **Sentinel** | Change |
-|---|---:|---:|---:|
-| False alarms on legitimate transactions | 91 | **49** | **−46%** |
-| Transactions sent to manual review | 153 | **106** | **−31%** |
-| Legitimate customer spend held for review | €66,282 | **€35,420** | **−47%** |
-| Precision of the review queue | 0.405 | **0.538** | **+33%** |
-| PR-AUC | 0.744 | **0.776** | **+0.032** |
-| Fraud cost vs. no screening¹ | | **−62%** | |
+Evaluated on a **held-out, time-ordered test window of 56,746 real card transactions** that the model never saw during training or tuning, against a logistic-regression baseline. Both models' thresholds were tuned on validation data to an 80% recall target. Fraud cost is missed fraud value plus €5 per manual review, compared with letting every transaction through.
 
-| Latency (Apple M-series laptop, 1 worker) | p50 | p95 | p99 |
+<details>
+<summary><b>Latency breakdown</b>: 2 ms model inference, under 10 ms p99 end to end over HTTP</summary>
+<br>
+
+| Apple M-series laptop, 1 worker | p50 | p95 | p99 |
 |---|---:|---:|---:|
 | Model inference, single transaction | 1.9 ms | 2.0 ms | 2.1 ms |
 | `POST /predict` end to end over HTTP | 3.8 ms | 4.2 ms | **9.7 ms** |
 | `POST /predict/batch`, 100 transactions | 10.9 ms | 11.0 ms | 11.1 ms |
 | Throughput at concurrency 8 | **260 requests/s** | | |
 
-<sub>¹ Missed fraud value plus €5 per manual review, compared with letting every transaction through. Full reports: [model evaluation](reports/model_evaluation_report.md) · [benchmark](docs/benchmarks.md).</sub>
+</details>
+
+Full reports: [model evaluation](reports/model_evaluation_report.md) · [benchmark](docs/benchmarks.md)
 
 ## What it does
 
-- **Scores transactions in real time.** `POST /predict` validates the payload, applies the training-time preprocessing, and returns a fraud probability, an anomaly rank, a risk level and an APPROVE / REVIEW decision in under 10 ms.
-- **Watches its own inputs.** Every scored transaction is logged. Evidently compares recent traffic with the serving model's reference data feature by feature, and also checks for prediction drift.
-- **Retrains itself, safely.** Drift alerts or a manual request start a background retraining run. The candidate is promoted only if it passes a validation gate against the serving model, and is otherwise rejected and kept for audit.
-- **Gives the fraud team a console.** A purpose-built dashboard served by the same API shows impact, live scoring, drift checks and the model registry with one-click rollback.
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### ⚡ Scores in real time
+`POST /predict` validates the payload, applies the training-time preprocessing, and returns a fraud probability, an anomaly rank, a risk level and an APPROVE / REVIEW decision in under 10 ms.
+
+</td>
+<td width="50%" valign="top">
+
+### 📈 Watches its own inputs
+Every scored transaction is logged. Evidently compares recent traffic with the serving model's reference data feature by feature, and also checks for prediction drift.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 🔁 Retrains itself, safely
+Drift alerts or a manual request start a background retraining run. The candidate is promoted only if it passes a validation gate against the serving model, and is otherwise rejected and kept for audit.
+
+</td>
+<td width="50%" valign="top">
+
+### 🗂️ Gives the fraud team a console
+A purpose-built dashboard served by the same API shows impact, live scoring, drift checks and the model registry with one-click rollback.
+
+</td>
+</tr>
+</table>
 
 ## Architecture
 
-```mermaid
-flowchart LR
-  subgraph Offline training
-    D[(Transactions)] --> V[Validate + time-ordered split]
-    V --> T[Train: LR baseline · XGBoost · Isolation Forest · ensemble search]
-    T --> A[(Versioned artifact<br/>model · preprocessor · threshold · SHA-256 manifest)]
-    T --> ML[(MLflow)]
-  end
-  A --> R[Model registry<br/>active · approved stack · history]
-  subgraph "Sentinel service (FastAPI, one container)"
-    UI[Operations console] -->|HTTP| P[/POST /predict/]
-    P --> E[(Event store)]
-    E --> M[Drift monitor · Evidently]
-    M -->|alert| O[Retraining orchestrator<br/>background worker]
-    O --> T
-    O --> G{Promotion gate<br/>same validation split as serving model}
-    G -->|pass| R
-    G -->|fail| K[Reject · keep serving model]
-  end
-  R -->|hot swap| P
-```
+<img src="docs/assets/architecture.svg" alt="Architecture: offline training (validate and time-ordered split, train LR, XGBoost and Isolation Forest, versioned SHA-256 artifact, MLflow) feeds the model registry. In the service, the ops console calls POST /predict, predictions go to the event store, Evidently checks drift, an alert starts retraining, and a promotion gate either promotes the candidate (hot swap, no restart) or rejects it." width="100%">
 
 ## Engineering highlights
 
-**Machine learning done rigorously**
+<details>
+<summary><b>Machine learning done rigorously</b>: leakage-free time split, imbalance-aware XGBoost, cost-aware threshold, bootstrap confidence intervals</summary>
+<br>
+
 - **No leakage by construction.** The split is chronological (60/20/20 by transaction time). Preprocessing is fitted on the training data only. Thresholds, ensemble weights and model selection use validation data only, and the test split is scored exactly once.
 - **Built for extreme imbalance (0.17% fraud).** XGBoost uses `scale_pos_weight` instead of resampling, early-stops on validation PR-AUC, and is evaluated on PR-AUC, precision and recall rather than accuracy.
 - **Business-aware operating point.** The threshold maximises precision subject to a recall target. Results are reported both statistically and in money: fraud value caught, legitimate spend held, and total cost.
 - **Uncertainty reported.** Every test metric comes with 95% bootstrap confidence intervals.
 - **Automated model selection.** XGBoost is compared with XGBoost + Isolation Forest blends on validation PR-AUC. The simpler model serves unless a blend wins by a set margin.
 
-**MLOps**
+</details>
+
+<details>
+<summary><b>MLOps</b>: tamper-evident artifacts, registry with promotion gate and rollback, drift-triggered retraining, MLflow tracking</summary>
+<br>
+
 - **Versioned, tamper-evident artifacts.** Each version bundles the model, preprocessor, threshold, drift reference, metrics and a SHA-256 manifest, which is verified before every load or promotion.
 - **Registry with an audit trail.** It tracks candidate, approved, rejected and rolled-back versions. Promotion hot-swaps the serving model with no restart, and rollback re-verifies the previous artifact first.
 - **Promotion gate.** The candidate and the serving model are scored on the same validation split. A candidate is promoted only if it clears recall and precision floors, has at least 30 validation frauds behind it, and does not lose PR-AUC.
@@ -89,13 +109,20 @@ flowchart LR
 - **Retraining state machine.** Runs move from `pending` to `checking`, `training` and `evaluating`, then end as `promoted`, `rejected`, `failed` or `skipped`. A single worker prevents concurrent runs, and runs orphaned by a crash are marked failed at startup.
 - **Experiment tracking.** Every training run logs its parameters and metrics to MLflow.
 
-**Software engineering**
+</details>
+
+<details>
+<summary><b>Software engineering</b>: strict Pydantic API, 42 tests, CI, one-container deploy, reproducible benchmark, Azure ML scripts</summary>
+<br>
+
 - **FastAPI with strict Pydantic v2 schemas.** Unknown, missing, non-finite or out-of-range fields return HTTP 422, and nothing is silently defaulted.
 - **42 automated tests** cover validation, splitting, leakage invariants, artifact tamper detection, API contracts, drift triggers, promotion and rejection paths, rollback, and drift-to-retraining end to end.
 - **CI on GitHub Actions** runs lint (ruff), the tests, a smoke test and a Docker build.
 - **One container** serves the API, the console and the retraining worker. Model state persists on a volume, and a health check is built in.
 - **A reproducible latency benchmark** reports p50, p95 and p99 for model-only, HTTP, batch and concurrent load.
 - **Cloud deployment scripts** for Azure ML managed online endpoints, with blue/green slots, a smoke test and traffic-switch rollback.
+
+</details>
 
 ## The operations console
 
@@ -152,7 +179,9 @@ curl -s -X POST localhost:8000/predict -H 'content-type: application/json' -d @e
 # {"fraud_probability": 0.9969, "anomaly_score": 0.98, "risk_category": "HIGH", "decision": "REVIEW", ...}
 ```
 
-## Project structure
+<details>
+<summary><b>Project structure</b></summary>
+<br>
 
 ```
 app/
@@ -170,6 +199,8 @@ tests/          42 tests on synthetic fixtures (no dataset needed)
 deployment/     Azure ML managed online endpoint scripts
 docs/           architecture, engineering decisions, evaluation, benchmarks
 ```
+
+</details>
 
 More detail: [architecture](docs/architecture.md) · [engineering decisions](docs/engineering_decisions.md) · [model evaluation](docs/model_evaluation.md) · [benchmarks](docs/benchmarks.md) · [Azure ML deployment](docs/azure_ml.md)
 
